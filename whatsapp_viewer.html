@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Chat Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: #075e54;
+            color: white;
+            padding: 24px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .upload-section {
+            padding: 40px;
+            text-align: center;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .upload-area {
+            border: 3px dashed #d0d0d0;
+            border-radius: 12px;
+            padding: 40px;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #fafafa;
+        }
+
+        .upload-area:hover {
+            border-color: #075e54;
+            background: #f0f9f8;
+        }
+
+        .upload-area.drag-over {
+            border-color: #25d366;
+            background: #e8f5e9;
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .upload-text {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .upload-subtext {
+            font-size: 14px;
+            color: #666;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .chat-container {
+            max-height: 600px;
+            overflow-y: auto;
+            padding: 20px;
+            background: #e5ddd5;
+        }
+
+        .chat-container::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .chat-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        .chat-container::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+
+        .date-divider {
+            text-align: center;
+            margin: 20px 0;
+            position: relative;
+        }
+
+        .date-divider span {
+            background: #dcf8c6;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            color: #333;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+
+        .message {
+            margin: 8px 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .message.sent {
+            align-items: flex-end;
+        }
+
+        .message.received {
+            align-items: flex-start;
+        }
+
+        .message-bubble {
+            max-width: 70%;
+            padding: 8px 12px;
+            border-radius: 8px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            position: relative;
+        }
+
+        .message.sent .message-bubble {
+            background: #dcf8c6;
+        }
+
+        .message.received .message-bubble {
+            background: white;
+        }
+
+        .sender-name {
+            font-weight: 600;
+            font-size: 13px;
+            color: #075e54;
+            margin-bottom: 4px;
+        }
+
+        .message-text {
+            font-size: 14px;
+            color: #303030;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+        }
+
+        .message-time {
+            font-size: 11px;
+            color: #667781;
+            margin-top: 4px;
+            text-align: right;
+        }
+
+        .stats {
+            padding: 16px 24px;
+            background: #f5f5f5;
+            border-top: 1px solid #e0e0e0;
+            font-size: 13px;
+            color: #666;
+            text-align: center;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📱 WhatsApp Chat Viewer</h1>
+            <p>Upload your exported chat file to view it in a clean format</p>
+        </div>
+
+        <div class="upload-section" id="uploadSection">
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📄</div>
+                <div class="upload-text">Click to upload or drag and drop</div>
+                <div class="upload-subtext">WhatsApp chat export (.txt)</div>
+            </div>
+            <input type="file" id="fileInput" accept=".txt">
+        </div>
+
+        <div id="chatContainer" class="chat-container hidden"></div>
+        <div id="stats" class="stats hidden"></div>
+    </div>
+
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const chatContainer = document.getElementById('chatContainer');
+        const statsDiv = document.getElementById('stats');
+        const uploadSection = document.getElementById('uploadSection');
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('drag-over');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('drag-over');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('drag-over');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type === 'text/plain') {
+                processFile(file);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                processFile(file);
+            }
+        });
+
+        function processFile(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const content = e.target.result;
+                parseAndDisplayChat(content);
+            };
+            reader.readAsText(file);
+        }
+
+        function parseAndDisplayChat(content) {
+            const lines = content.split('\n');
+            const messages = [];
+            let currentMessage = null;
+            const messagePattern = /^(\d{1,2}\/\d{1,2}\/\d{2,4}),?\s+(\d{1,2}:\d{2}(?::\d{2})?\s*(?:[AP]M)?)\s*[-–]\s*([^:]+):\s*(.+)$/i;
+
+            lines.forEach(line => {
+                const match = line.match(messagePattern);
+                if (match) {
+                    if (currentMessage) {
+                        messages.push(currentMessage);
+                    }
+                    currentMessage = {
+                        date: match[1].trim(),
+                        time: match[2].trim(),
+                        sender: match[3].trim(),
+                        text: match[4].trim()
+                    };
+                } else if (currentMessage && line.trim()) {
+                    currentMessage.text += '\n' + line.trim();
+                }
+            });
+
+            if (currentMessage) {
+                messages.push(currentMessage);
+            }
+
+            displayMessages(messages);
+        }
+
+        function displayMessages(messages) {
+            if (messages.length === 0) {
+                chatContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: #666;">No messages found. Please check the file format.</div>';
+                chatContainer.classList.remove('hidden');
+                return;
+            }
+
+            chatContainer.innerHTML = '';
+            let lastDate = '';
+            const senders = new Set();
+            const senderColors = {};
+            const colors = ['#075e54', '#128c7e', '#25d366', '#34b7f1', '#8b5cf6', '#ec4899', '#f59e0b'];
+            let colorIndex = 0;
+
+            messages.forEach((msg, index) => {
+                senders.add(msg.sender);
+                
+                if (!senderColors[msg.sender]) {
+                    senderColors[msg.sender] = colors[colorIndex % colors.length];
+                    colorIndex++;
+                }
+
+                if (msg.date !== lastDate) {
+                    const dateDivider = document.createElement('div');
+                    dateDivider.className = 'date-divider';
+                    dateDivider.innerHTML = `<span>${msg.date}</span>`;
+                    chatContainer.appendChild(dateDivider);
+                    lastDate = msg.date;
+                }
+
+                const messageDiv = document.createElement('div');
+                const prevSender = index > 0 ? messages[index - 1].sender : null;
+                messageDiv.className = `message ${index % 2 === 0 ? 'sent' : 'received'}`;
+
+                const bubble = document.createElement('div');
+                bubble.className = 'message-bubble';
+
+                const senderName = document.createElement('div');
+                senderName.className = 'sender-name';
+                senderName.textContent = msg.sender;
+                senderName.style.color = senderColors[msg.sender];
+                bubble.appendChild(senderName);
+
+                const text = document.createElement('div');
+                text.className = 'message-text';
+                text.textContent = msg.text;
+                bubble.appendChild(text);
+
+                const time = document.createElement('div');
+                time.className = 'message-time';
+                time.textContent = msg.time;
+                bubble.appendChild(time);
+
+                messageDiv.appendChild(bubble);
+                chatContainer.appendChild(messageDiv);
+            });
+
+            chatContainer.classList.remove('hidden');
+            statsDiv.innerHTML = `📊 ${messages.length} messages • ${senders.size} participant${senders.size > 1 ? 's' : ''}`;
+            statsDiv.classList.remove('hidden');
+            uploadSection.style.display = 'none';
+        }
+    </script>
+</body>
+</html>
